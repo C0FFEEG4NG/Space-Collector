@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Collector</title>
+    <!-- Tailwind CSS for utility classes -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Orbitron for a futuristic look -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Basic body styling to remove margins and set background */
+        body {
+            margin: 0;
+            overflow: hidden; /* Prevent scrolling */
+            background-color: #000; /* Black background for space */
+            font-family: 'Orbitron', sans-serif; /* Futuristic font */
+            color: white; /* White text for contrast */
+        }
+        /* Canvas styling to make it a block element */
+        canvas {
+            display: block;
+        }
+        /* Overlay styles for title, pause, and game over screens */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent black overlay */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            pointer-events: auto; /* Allow interaction with buttons */
+            backdrop-filter: blur(5px); /* Blurs the background content */
+            border-radius: 15px; /* Rounded corners for the overlay */
+        }
+        .overlay h1 {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        .overlay p {
+            font-size: 1.2rem;
+            max-width: 400px;
+            line-height: 1.5;
+            margin-bottom: 2rem;
+        }
+        /* Styling for overlay buttons */
+        .overlay-button {
+            padding: 15px 30px;
+            font-size: 1.5rem;
+            color: white;
+            border: none;
+            border-radius: 10px; /* Rounded button corners */
+            cursor: pointer;
+            transition: all 0.2s ease-in-out; /* Smooth transitions for hover effects */
+            font-family: 'Orbitron', sans-serif;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3); /* Subtle shadow */
+        }
+        /* Specific styles for title screen elements */
+        #title-screen h1 {
+            color: #00ffff; /* Cyan color */
+            text-shadow: 0 0 15px #00ffff; /* Glowing effect */
+        }
+        #start-button {
+            background: linear-gradient(145deg, #00ffff, #007777); /* Gradient background */
+            box-shadow: 0 0 15px #00ffff, 0 0 25px #00ffff inset; /* Outer and inner glow */
+        }
+        #start-button:hover {
+            transform: scale(1.05); /* Slightly enlarge on hover */
+            box-shadow: 0 0 25px #00ffff, 0 0 35px #00ffff inset; /* Enhanced glow on hover */
+        }
+        /* Hidden by default for game over, pause, and settings screens */
+        #game-over-screen, #pause-screen, #settings-screen {
+            display: none;
+        }
+        /* Specific styles for game over screen elements */
+        #game-over-screen h1 {
+            color: #ff4444; /* Red color */
+            text-shadow: 0 0 15px #ff0000; /* Red glowing effect */
+        }
+        #restart-button {
+            background: linear-gradient(145deg, #ff4444, #8b0000); /* Red gradient */
+            box-shadow: 0 0 15px #ff4444, 0 0 25px #ff4444 inset;
+        }
+        #restart-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px #ff4444, 0 0 35px #ff4444 inset;
+        }
+        /* Specific styles for pause screen elements */
+        #pause-screen h1 {
+            color: #ffff00; /* Yellow color */
+            text-shadow: 0 0 15px #ffff00; /* Yellow glowing effect */
+        }
+        #resume-button {
+            background: linear-gradient(145deg, #ffff00, #bba000); /* Yellow gradient */
+            box-shadow: 0 0 15px #ffff00, 0 0 25px #ffff00 inset;
+        }
+        #resume-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px #ffff00, 0 0 35px #ffff00 inset;
+        }
+        /* Styles for settings screen */
+        #settings-screen h1 {
+            color: #00ddff; /* Light blue color */
+            text-shadow: 0 0 15px #00ddff;
+        }
+        #settings-screen .overlay-button {
+            margin-top: 1rem; /* Spacing between buttons */
+        }
+        /* UI container for score */
+        #ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Allow mouse events to pass through to the canvas */
+            display: flex;
+            justify-content: center;
+            padding-top: 20px;
+        }
+        #score {
+            font-size: 2rem;
+            text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff; /* Glowing score text */
+            display: none; /* Hidden until game starts */
+            pointer-events: auto; /* Allow interaction if needed, though not for score */
+        }
+        /* Ship model buttons layout */
+        #ship-model-buttons {
+            display: flex;
+            flex-wrap: wrap; /* Allow buttons to wrap to next line */
+            justify-content: center;
+            gap: 1rem; /* Space between buttons */
+            max-width: 600px; /* Limit width to prevent stretching */
+        }
+        #ship-model-buttons .overlay-button {
+            flex: 1 1 auto; /* Allow buttons to grow and shrink */
+            min-width: 120px; /* Minimum width for buttons */
+        }
+    </style>
+</head>
+<body>
+    <!-- UI Elements -->
+    <div id="ui-container">
+        <div id="score">Score: 0</div>
+    </div>
+
+    <!-- Title Screen Overlay -->
+    <div id="title-screen" class="overlay">
+        <h1>Cosmic Collector</h1>
+        <p>Use your mouse to pilot the UFO. Collect the green crystals for points, but avoid crashing into the asteroids!</p>
+        <button id="start-button" class="overlay-button">Start Game</button>
+    </div>
+
+    <!-- Pause Screen Overlay -->
+    <div id="pause-screen" class="overlay">
+        <h1>PAUSED</h1>
+        <button id="resume-button" class="overlay-button">Resume</button>
+        <button id="settings-button" class="overlay-button mt-4 bg-gray-600 hover:bg-gray-700">Settings</button>
+    </div>
+
+    <!-- Settings Screen Overlay -->
+    <div id="settings-screen" class="overlay">
+        <h1>SETTINGS</h1>
+        <div class="flex flex-col items-center space-y-4">
+            <label class="text-xl mt-4">Ship Model:</label>
+            <div id="ship-model-buttons">
+                <button id="ship-saucer" class="overlay-button bg-blue-600 hover:bg-blue-700">Saucer</button>
+                <button id="ship-sphere" class="overlay-button bg-purple-600 hover:bg-purple-700">Sphere</button>
+                <button id="ship-box" class="overlay-button bg-green-600 hover:bg-green-700">Box</button>
+                <button id="ship-cone" class="overlay-button bg-red-600 hover:bg-red-700">Cone</button>
+                <button id="ship-pyramid" class="overlay-button bg-yellow-600 hover:bg-yellow-700">Pyramid</button>
+                <button id="ship-torus" class="overlay-button bg-cyan-600 hover:bg-cyan-700">Torus</button>
+                <button id="ship-rocket" class="overlay-button bg-orange-600 hover:bg-orange-700">Rocket</button>
+            </div>
+        </div>
+        <button id="back-to-pause-button" class="overlay-button mt-8 bg-gray-600 hover:bg-gray-700">Back</button>
+    </div>
+
+    <!-- Game Over Screen Overlay -->
+    <div id="game-over-screen" class="overlay">
+        <h1>GAME OVER</h1>
+        <p id="final-score">Your Score: 0</p>
+        <button id="restart-button" class="overlay-button">Restart</button>
+    </div>
+
+    <!-- Three.js and Tone.js Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <script>
+        // --- SCENE SETUP ---
+        let scene, camera, renderer; // Three.js core components
+        let playerShip, starField; // Game objects
+        let asteroids = [], crystals = []; // Arrays to hold dynamic objects
+        let score = 0; // Player's score
+        let isGameStarted = false; // Game state flags
+        let isGameOver = false;
+        let isPaused = false; // State for pausing the game
+        let musicLoop; // Tone.js music loop
+        let currentShipModel = 'saucer'; // Default ship model
+        let baseSpeed = 1.0; // Base speed for objects moving towards camera
+        let currentSpeed = baseSpeed; // Current speed, affected by power-ups
+
+        // --- POWER-UP VARIABLES ---
+        let powerUps = []; // Array to hold active power-up objects in the scene
+        let activePowerUps = { // Object to track active power-up states and their end times
+            shield: 0,
+            speedBoost: 0,
+            ghostMode: 0,
+            doubleScore: 0,
+            invincible: 0
+        };
+        const powerUpDurations = { // Durations for each power-up in milliseconds
+            shield: 7000, // 7 seconds
+            speedBoost: 7000, // 7 seconds
+            ghostMode: 7000, // 7 seconds
+            doubleScore: 15000, // 15 seconds
+            invincible: 7000 // 7 seconds
+        };
+        const powerUpTypes = ['shield', 'speedBoost', 'ghostMode', 'doubleScore', 'invincible'];
+        const powerUpSpawnChance = 0.02; // 2% chance to spawn a power-up instead of an asteroid/crystal
+
+        // --- DOM ELEMENTS ---
+        // Declare variables here, but assign them inside init() to ensure DOM is loaded
+        let scoreElement, titleScreen, startButton, pauseScreen, resumeButton,
+            gameOverScreen, finalScoreElement, restartButton, settingsButton,
+            settingsScreen, shipSaucerButton, shipSphereButton,
+            shipBoxButton, shipConeButton, shipPyramidButton, shipTorusButton,
+            shipRocketButton, backToPauseButton;
+
+        // --- INITIALIZATION ---
+        // Sets up the Three.js scene, camera, renderer, and initial game objects
+        function init() {
+            // Assign DOM elements here, after the DOM is fully loaded (due to window.onload)
+            scoreElement = document.getElementById('score');
+            titleScreen = document.getElementById('title-screen');
+            startButton = document.getElementById('start-button');
+            pauseScreen = document.getElementById('pause-screen');
+            resumeButton = document.getElementById('resume-button');
+            gameOverScreen = document.getElementById('game-over-screen');
+            finalScoreElement = document.getElementById('final-score');
+            restartButton = document.getElementById('restart-button');
+
+            settingsButton = document.getElementById('settings-button');
+            settingsScreen = document.getElementById('settings-screen');
+            shipSaucerButton = document.getElementById('ship-saucer');
+            shipSphereButton = document.getElementById('ship-sphere');
+            shipBoxButton = document.getElementById('ship-box');
+            shipConeButton = document.getElementById('ship-cone');
+            shipPyramidButton = document.getElementById('ship-pyramid');
+            shipTorusButton = document.getElementById('ship-torus');
+            shipRocketButton = document.getElementById('ship-rocket');
+            backToPauseButton = document.getElementById('back-to-pause-button');
+
+            // Create a new Three.js scene
+            scene = new THREE.Scene();
+            // Add fog to simulate depth in space
+            scene.fog = new THREE.FogExp2(0x000000, 0.001); // Black fog, density 0.001
+
+            // Create a perspective camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 8, 25); // Set initial camera position
+            camera.lookAt(0, 0, 0); // Make camera look at the origin
+
+            // Create a WebGL renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true }); // Enable anti-aliasing for smoother edges
+            renderer.setSize(window.innerWidth, window.innerHeight); // Set renderer size to full window
+            document.body.appendChild(renderer.domElement); // Add the renderer's canvas to the DOM
+
+            // Add ambient light to illuminate all objects equally
+            const ambientLight = new THREE.AmbientLight(0x404040, 2); // Soft white light
+            scene.add(ambientLight);
+
+            // Add a directional light for more realistic shading
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5); // White light, intensity 1.5
+            directionalLight.position.set(5, 10, 7.5); // Position the light source
+            scene.add(directionalLight);
+
+            changeShipModel('saucer'); // Create the player's UFO (initial model)
+            createStarField(); // Create the background star field
+            spawnInitialObjects(); // Populate the scene with initial asteroids and crystals
+            setupEventListeners(); // Set up all interactive event listeners
+            setupMusic(); // Initialize background music
+        }
+
+        // --- EVENT LISTENERS SETUP ---
+        // Attaches event handlers to UI buttons and window events
+        function setupEventListeners() {
+            startButton.addEventListener('click', startGame); // Start button click handler
+            restartButton.addEventListener('click', restartGame); // Restart button click handler
+            resumeButton.addEventListener('click', togglePause); // Resume button click handler (also toggles pause)
+            
+            // Settings menu event listeners
+            settingsButton.addEventListener('click', showSettings);
+            backToPauseButton.addEventListener('click', hideSettings);
+            shipSaucerButton.addEventListener('click', () => changeShipModel('saucer'));
+            shipSphereButton.addEventListener('click', () => changeShipModel('sphere'));
+            shipBoxButton.addEventListener('click', () => changeShipModel('box'));
+            shipConeButton.addEventListener('click', () => changeShipModel('cone'));
+            shipPyramidButton.addEventListener('click', () => changeShipModel('pyramid'));
+            shipTorusButton.addEventListener('click', () => changeShipModel('torus'));
+            shipRocketButton.addEventListener('click', () => changeShipModel('rocket'));
+
+            document.addEventListener('mousemove', onMouseMove, false); // Mouse movement for ship control
+            window.addEventListener('resize', onWindowResize, false); // Window resize handler for responsiveness
+
+            // Listen for the Escape key to toggle pause
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && isGameStarted && !isGameOver) {
+                    // If currently on settings screen, go back to pause screen
+                    if (settingsScreen.style.display === 'flex') {
+                        hideSettings();
+                    } else {
+                        togglePause(); // Toggle pause if game is running and not over
+                    }
+                }
+            });
+        }
+
+        // --- MUSIC SETUP (Tone.js) ---
+        // Initializes and starts background music using Tone.js
+        function setupMusic() {
+            // Create a basic synthesizer
+            const synth = new Tone.Synth({
+                oscillator: { type: 'fmsine' }, // FM sine wave oscillator
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 1 } // ADSR envelope for sound shaping
+            }).toDestination(); // Connect synth to the audio output
+
+            // Define a simple musical sequence
+            const notes = ['C3', 'E3', 'G3', 'B3', 'C4', 'B3', 'G3', 'E3'];
+            // Create a Tone.Sequence to play notes in a loop
+            musicLoop = new Tone.Sequence((time, note) => {
+                synth.triggerAttackRelease(note, '8n', time); // Play note for an 8th note duration
+            }, notes, '4n').start(0); // Play each note every quarter note, starting immediately
+
+            Tone.Transport.bpm.value = 120; // Set the tempo to 120 beats per minute
+            Tone.Transport.volume.value = -10; // Set a fixed default volume (e.g., -10dB)
+        }
+
+        // --- GAME STATE MANAGEMENT ---
+        // Handles starting, pausing, game over, and restarting the game
+        async function startGame() {
+            // Tone.js requires user interaction to start audio context
+            await Tone.start();
+            Tone.Transport.start(); // Start the Tone.js transport for music playback
+            
+            isGameStarted = true; // Set game state to started
+            titleScreen.style.display = 'none'; // Hide the title screen
+            scoreElement.style.display = 'block'; // Show the score display
+            animate(); // Start the animation loop
+        }
+
+        function togglePause() {
+            isPaused = !isPaused; // Toggle the pause state
+            if (isPaused) {
+                Tone.Transport.pause(); // Pause the music
+                pauseScreen.style.display = 'flex'; // Show the pause screen
+            } else {
+                Tone.Transport.start(); // Resume the music
+                pauseScreen.style.display = 'none'; // Hide the pause screen
+                animate(); // Resume the animation loop
+            }
+        }
+
+        function showSettings() {
+            pauseScreen.style.display = 'none'; // Hide pause screen
+            settingsScreen.style.display = 'flex'; // Show settings screen
+        }
+
+        function hideSettings() {
+            settingsScreen.style.display = 'none'; // Hide settings screen
+            pauseScreen.style.display = 'flex'; // Show pause screen
+        }
+
+        function triggerGameOver() {
+            isGameOver = true; // Set game state to game over
+            Tone.Transport.stop(); // Stop the music
+            finalScoreElement.innerText = `Your Score: ${score}`; // Display final score
+            gameOverScreen.style.display = 'flex'; // Show the game over screen
+        }
+
+        function restartGame() {
+            isGameOver = false; // Reset game over state
+            isPaused = false; // Ensure not paused on restart
+            score = 0; // Reset score
+            scoreElement.innerText = `Score: 0`; // Update score display
+            gameOverScreen.style.display = 'none'; // Hide game over screen
+            pauseScreen.style.display = 'none'; // Hide pause screen
+            settingsScreen.style.display = 'none'; // Ensure settings screen is also hidden
+
+            // Reset player ship position and rotation
+            playerShip.position.set(0, 0, 0);
+            playerShip.rotation.set(0, 0, 0);
+
+            // Reset camera position
+            camera.position.set(0, 8, 25);
+
+            // Remove all existing asteroids and crystals and power-ups from the scene
+            asteroids.forEach(a => scene.remove(a));
+            crystals.forEach(c => scene.remove(c));
+            powerUps.forEach(p => scene.remove(p)); // Remove power-ups
+            asteroids = []; // Clear arrays
+            crystals = [];
+            powerUps = []; // Clear power-ups array
+
+            // Reset active power-ups
+            for (const key in activePowerUps) {
+                activePowerUps[key] = 0;
+            }
+            currentSpeed = baseSpeed; // Reset speed
+
+            spawnInitialObjects(); // Re-spawn new objects
+            Tone.Transport.start(); // Restart music
+            animate(); // Restart animation loop
+        }
+
+        // --- GAME OBJECT CREATION ---
+        // Functions to create the 3D models for the player ship, stars, asteroids, and crystals
+        function createPlayerShip() {
+            // This function is now replaced by changeShipModel
+            // It remains here as a placeholder or if direct creation is needed elsewhere
+        }
+
+        function changeShipModel(modelType) {
+            // Remove current ship from the scene if it exists
+            if (playerShip) {
+                scene.remove(playerShip);
+            }
+
+            const shipGroup = new THREE.Group();
+            // Common materials for ship parts
+            const mainMaterial = new THREE.MeshStandardMaterial({ color: 0xbbbbdd, metalness: 0.9, roughness: 0.3 });
+            const cockpitMaterial = new THREE.MeshStandardMaterial({ color: 0x00eeee, emissive: 0x00eeee, emissiveIntensity: 0.8, transparent: true, opacity: 0.7 });
+            const lightMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00, emissive: 0x00ff00, emissiveIntensity: 1 });
+
+            switch (modelType) {
+                case 'sphere':
+                    const sphereBody = new THREE.Mesh(new THREE.SphereGeometry(2.5, 32, 32), mainMaterial);
+                    shipGroup.add(sphereBody);
+                    // Simple cockpit and light for sphere
+                    const sphereCockpit = new THREE.Mesh(new THREE.SphereGeometry(1.0, 16, 16), cockpitMaterial);
+                    sphereCockpit.position.y = 1.5;
+                    shipGroup.add(sphereCockpit);
+                    const sphereLight = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 16), lightMaterial);
+                    sphereLight.position.y = -1.5;
+                    shipGroup.add(sphereLight);
+                    break;
+                case 'box':
+                    const boxBody = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 4), mainMaterial);
+                    shipGroup.add(boxBody);
+                    // Simple cockpit and light for box
+                    const boxCockpit = new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 16), cockpitMaterial);
+                    boxCockpit.position.y = 1.2;
+                    shipGroup.add(boxCockpit);
+                    const boxLight = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 16), lightMaterial);
+                    boxLight.position.y = -1.2;
+                    shipGroup.add(boxLight);
+                    break;
+                case 'cone':
+                    const coneBody = new THREE.Mesh(new THREE.ConeGeometry(2.5, 4, 32), mainMaterial);
+                    coneBody.position.y = 0.5; // Adjust position for cone to sit properly
+                    shipGroup.add(coneBody);
+                    // Simple cockpit and light for cone
+                    const coneCockpit = new THREE.Mesh(new THREE.SphereGeometry(1.0, 16, 16), cockpitMaterial);
+                    coneCockpit.position.y = 2.5;
+                    shipGroup.add(coneCockpit);
+                    const coneLight = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 16), lightMaterial);
+                    coneLight.position.y = -1.5;
+                    shipGroup.add(coneLight);
+                    break;
+                case 'pyramid':
+                    const pyramidBody = new THREE.Mesh(new THREE.ConeGeometry(2.5, 4, 4), mainMaterial); // Cone with 4 segments for pyramid
+                    pyramidBody.rotation.y = Math.PI / 4; // Rotate to align with axes
+                    pyramidBody.position.y = 0.5;
+                    shipGroup.add(pyramidBody);
+                    // Simple cockpit and light for pyramid
+                    const pyramidCockpit = new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 16), cockpitMaterial);
+                    pyramidCockpit.position.y = 2.5;
+                    shipGroup.add(pyramidCockpit);
+                    const pyramidLight = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 16), lightMaterial);
+                    pyramidLight.position.y = -1.5;
+                    shipGroup.add(pyramidLight);
+                    break;
+                case 'torus':
+                    const torusBody = new THREE.Mesh(new THREE.TorusGeometry(2, 0.8, 16, 100), mainMaterial); // Radius, tube, radial segments, tubular segments
+                    torusBody.rotation.x = Math.PI / 2; // Orient horizontally
+                    shipGroup.add(torusBody);
+                    // Simple cockpit and light for torus
+                    const torusCockpit = new THREE.Mesh(new THREE.SphereGeometry(1.0, 16, 16), cockpitMaterial);
+                    torusCockpit.position.z = 0; // Center it
+                    torusCockpit.position.y = 0;
+                    shipGroup.add(torusCockpit);
+                    const torusLight = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 16), lightMaterial);
+                    torusLight.position.y = -0.8; // Position slightly below
+                    shipGroup.add(torusLight);
+                    break;
+                case 'rocket':
+                    // Main body (cylinder)
+                    const rocketBodyGeometry = new THREE.CylinderGeometry(1.5, 1.5, 6, 32);
+                    const rocketBody = new THREE.Mesh(rocketBodyGeometry, mainMaterial);
+                    shipGroup.add(rocketBody);
+
+                    // Nose cone (cone)
+                    const noseConeGeometry = new THREE.ConeGeometry(1.5, 3, 32);
+                    const noseCone = new THREE.Mesh(noseConeGeometry, mainMaterial);
+                    noseCone.position.y = 4.5; // Position above the body
+                    shipGroup.add(noseCone);
+
+                    // Fins (triangles/planes)
+                    const finMaterial = new THREE.MeshStandardMaterial({ color: 0x880000, metalness: 0.9, roughness: 0.3 }); // Reddish color for fins
+                    const finGeometry = new THREE.ShapeGeometry(new THREE.Shape([
+                        new THREE.Vector2(0, 0),
+                        new THREE.Vector2(0, 2),
+                        new THREE.Vector2(1.5, 0)
+                    ]));
+                    const fin1 = new THREE.Mesh(finGeometry, finMaterial);
+                    fin1.position.set(1.5, -2, 0);
+                    fin1.rotation.y = Math.PI / 2;
+                    shipGroup.add(fin1);
+
+                    const fin2 = new THREE.Mesh(finGeometry, finMaterial);
+                    fin2.position.set(-1.5, -2, 0);
+                    fin2.rotation.y = -Math.PI / 2;
+                    shipGroup.add(fin2);
+
+                    const fin3 = new THREE.Mesh(finGeometry, finMaterial);
+                    fin3.position.set(0, -2, 1.5);
+                    shipGroup.add(fin3);
+
+                    const fin4 = new THREE.Mesh(finGeometry, finMaterial);
+                    fin4.position.set(0, -2, -1.5);
+                    fin4.rotation.y = Math.PI;
+                    shipGroup.add(fin4);
+
+                    // Exhaust glow (light)
+                    const exhaustLight = new THREE.PointLight(0xffa500, 2, 10); // Orange light
+                    exhaustLight.position.y = -3.5;
+                    shipGroup.add(exhaustLight);
+
+                    // Rotate the entire rocket group to face forward (along negative Z-axis)
+                    shipGroup.rotation.x = Math.PI / 2; // Rotate 90 degrees around X-axis
+                    break;
+                case 'saucer': // Original saucer model
+                default:
+                    const saucerGeometry = new THREE.CylinderGeometry(2.5, 2.5, 0.5, 32);
+                    const saucer = new THREE.Mesh(saucerGeometry, mainMaterial);
+                    shipGroup.add(saucer);
+
+                    const domeGeometry = new THREE.SphereGeometry(1.2, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+                    const dome = new THREE.Mesh(domeGeometry, cockpitMaterial);
+                    dome.position.y = 0.25;
+                    shipGroup.add(dome);
+
+                    const bottomLightGeometry = new THREE.SphereGeometry(0.8, 32, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
+                    const bottomLight = new THREE.Mesh(bottomLightGeometry, lightMaterial);
+                    bottomLight.position.y = -0.25;
+                    shipGroup.add(bottomLight);
+                    break;
+            }
+
+            playerShip = shipGroup; // Assign the new group as the player ship
+            scene.add(playerShip); // Add the new ship to the scene
+            currentShipModel = modelType; // Update the current ship model state
+        }
+
+
+        function createStarField() {
+            const starGeometry = new THREE.BufferGeometry(); // Efficient geometry for many points
+            const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.1 }); // White stars, small size
+            const starVertices = []; // Array to store star positions
+
+            // Generate 10,000 random star positions
+            for (let i = 0; i < 10000; i++) {
+                const x = THREE.MathUtils.randFloatSpread(2000); // Random X between -1000 and 1000
+                const y = THREE.MathUtils.randFloatSpread(2000); // Random Y between -1000 and 1000
+                const z = THREE.MathUtils.randFloatSpread(2000); // Random Z between -1000 and 1000
+                starVertices.push(x, y, z);
+            }
+            // Set the positions attribute for the geometry
+            starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+            starField = new THREE.Points(starGeometry, starMaterial); // Create points object
+            scene.add(starField); // Add stars to the scene
+        }
+
+        function createAsteroid() {
+            const size = THREE.MathUtils.randFloat(2, 6); // Random size for asteroid
+            const geometry = new THREE.DodecahedronGeometry(size, 0); // Dodecahedron for rocky shape
+            const material = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.8, metalness: 0.1 }); // Brown, rough material
+            const asteroid = new THREE.Mesh(geometry, material);
+
+            // Position asteroid far in front of the camera, randomly spread
+            asteroid.position.set(THREE.MathUtils.randFloatSpread(150), THREE.MathUtils.randFloatSpread(150), camera.position.z - 500);
+            // Give random initial rotation
+            asteroid.rotation.set(Math.random() * 2 * Math.PI, Math.random() * 2 * Math.PI, Math.random() * 2 * Math.PI);
+
+            asteroids.push(asteroid); // Add to asteroids array
+            scene.add(asteroid); // Add to scene
+        }
+
+        function createCrystal() {
+            const geometry = new THREE.IcosahedronGeometry(1.5, 0); // Icosahedron for crystal shape
+            const material = new THREE.MeshStandardMaterial({ color: 0x00ff00, emissive: 0x00ff00, emissiveIntensity: 1, roughness: 0.2, metalness: 0.5, transparent: true, opacity: 0.8 }); // Green, glowing, transparent material
+            const crystal = new THREE.Mesh(geometry, material);
+
+            // Position crystal far in front of the camera, randomly spread
+            crystal.position.set(THREE.MathUtils.randFloatSpread(100), THREE.MathUtils.randFloatSpread(100), camera.position.z - 300 - Math.random() * 300);
+
+            crystals.push(crystal); // Add to crystals array
+            scene.add(crystal); // Add to scene
+        }
+
+        // Function to create power-up objects
+        function createPowerUp(type) {
+            let geometry = new THREE.IcosahedronGeometry(1.8, 0); // Base geometry for power-ups (larger crystal)
+            let material;
+            let powerUpMesh;
+
+            switch (type) {
+                case 'shield':
+                    material = new THREE.MeshStandardMaterial({ color: 0x00BFFF, emissive: 0x00BFFF, emissiveIntensity: 0.7, transparent: true, opacity: 0.6, roughness: 0.2, metalness: 0.5 }); // Light Blue
+                    break;
+                case 'speedBoost':
+                    material = new THREE.MeshStandardMaterial({ color: 0x00008B, emissive: 0x00008B, emissiveIntensity: 0.7, roughness: 0.2, metalness: 0.5 }); // Dark Blue
+                    break;
+                case 'ghostMode':
+                    material = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, emissive: 0xFFFFFF, emissiveIntensity: 0.5, transparent: true, opacity: 0.3, roughness: 0.2, metalness: 0.5 }); // Translucent White
+                    break;
+                case 'doubleScore':
+                    material = new THREE.MeshStandardMaterial({ color: 0x006400, emissive: 0x006400, emissiveIntensity: 0.7, roughness: 0.2, metalness: 0.5 }); // Dark Green
+                    break;
+                case 'invincible':
+                    material = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, emissive: 0xFFFFFF, emissiveIntensity: 1, roughness: 0.2, metalness: 0.5 }); // White
+                    break;
+                default:
+                    material = new THREE.MeshStandardMaterial({ color: 0xff00ff, emissive: 0xff00ff, emissiveIntensity: 0.7, transparent: true, opacity: 0.8 }); // Default to magenta if type is unknown
+            }
+
+            powerUpMesh = new THREE.Mesh(geometry, material);
+            powerUpMesh.userData.type = type; // Store the power-up type in its userData
+
+            powerUpMesh.position.set(THREE.MathUtils.randFloatSpread(100), THREE.MathUtils.randFloatSpread(100), camera.position.z - 300 - Math.random() * 300);
+
+            powerUps.push(powerUpMesh);
+            scene.add(powerUpMesh);
+        }
+        
+        // Spawns initial set of asteroids and crystals when the game starts
+        function spawnInitialObjects() {
+            for (let i = 0; i < 50; i++) createAsteroid(); // 50 asteroids
+            for (let i = 0; i < 20; i++) createCrystal(); // 20 crystals
+            for (let i = 0; i < 5; i++) createPowerUp(powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)]); // 5 random power-ups
+        }
+
+        // --- EVENT HANDLERS ---
+        // Functions that respond to user input and window changes
+        function onMouseMove(event) {
+            // Only update ship position if game is started, not over, and not paused
+            if (!isGameStarted || isGameOver || isPaused) return;
+
+            // Normalize mouse coordinates to -1 to +1 range
+            const mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+            const mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            // Calculate target position for the ship based on mouse
+            const targetX = mouseX * 40; // Larger range for X movement
+            const targetY = mouseY * 20; // Smaller range for Y movement
+
+            // Smoothly interpolate ship's position towards the target
+            playerShip.position.x += (targetX - playerShip.position.x) * 0.05;
+            playerShip.position.y += (targetY - playerShip.position.y) * 0.05;
+
+            // Rotate the ship slightly based on mouse movement for visual feedback
+            playerShip.rotation.x = mouseY * 0.3;
+            playerShip.rotation.z = mouseX * -0.4;
+        }
+
+        // Handles window resizing to keep the game responsive
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight; // Update camera aspect ratio
+            camera.updateProjectionMatrix(); // Recalculate projection matrix
+            renderer.setSize(window.innerWidth, window.innerHeight); // Resize renderer
+        }
+
+        // --- GAME LOGIC ---
+        // Contains collision detection and object update logic
+        function checkCollisions() {
+            // Create a sphere collider for the player ship
+            const playerCollider = new THREE.Sphere(playerShip.position, 2.5); // Ship radius 2.5 (fixed for all models for simplicity)
+
+            // Check for collisions with asteroids
+            for (let i = asteroids.length - 1; i >= 0; i--) {
+                const asteroid = asteroids[i];
+                const asteroidBox = new THREE.Box3().setFromObject(asteroid);
+
+                // If player is invincible or in ghost mode, ignore asteroid collision
+                if (activePowerUps.invincible > Date.now() || activePowerUps.ghostMode > Date.now()) {
+                    continue; // Skip collision check for this asteroid
+                }
+
+                // If player has shield, destroy asteroid and consume shield
+                if (activePowerUps.shield > Date.now() && asteroidBox.intersectsSphere(playerCollider)) {
+                    scene.remove(asteroid);
+                    asteroids.splice(i, 1);
+                    // Optionally, deactivate shield immediately or reduce its duration
+                    // For now, shield remains active for its full duration, but destroys the asteroid
+                    continue; // Asteroid is destroyed, no game over
+                }
+
+                // If player collides with an asteroid and no protective power-up is active, trigger game over
+                if (asteroidBox.intersectsSphere(playerCollider)) {
+                    triggerGameOver();
+                    return; // Exit function immediately after game over
+                }
+            }
+
+            // Check for collisions with crystals
+            for (let i = crystals.length - 1; i >= 0; i--) {
+                const crystal = crystals[i];
+                const crystalBox = new THREE.Box3().setFromObject(crystal);
+                // If player collides with a crystal
+                if (crystalBox.intersectsSphere(playerCollider)) {
+                    scene.remove(crystal); // Remove crystal from scene
+                    crystals.splice(i, 1); // Remove from array
+                    score += (activePowerUps.doubleScore > Date.now()) ? 20 : 10; // Double score if 2x active
+                    scoreElement.innerText = `Score: ${score}`; // Update score display
+                    createCrystal(); // Spawn a new crystal
+                }
+            }
+
+            // Check for collisions with power-ups
+            for (let i = powerUps.length - 1; i >= 0; i--) {
+                const powerUp = powerUps[i];
+                const powerUpBox = new THREE.Box3().setFromObject(powerUp);
+                if (powerUpBox.intersectsSphere(playerCollider)) {
+                    scene.remove(powerUp);
+                    powerUps.splice(i, 1);
+                    activatePowerUp(powerUp.userData.type); // Activate the collected power-up
+                }
+            }
+        }
+
+        // Activates a power-up effect
+        function activatePowerUp(type) {
+            const now = Date.now();
+            activePowerUps[type] = now + powerUpDurations[type]; // Set end time
+
+            // Apply immediate effects and visual cues
+            switch (type) {
+                case 'shield':
+                    // Add a visual shield around the player ship
+                    const shieldGeometry = new THREE.SphereGeometry(3, 32, 32);
+                    const shieldMaterial = new THREE.MeshBasicMaterial({ color: 0x00BFFF, transparent: true, opacity: 0.2, wireframe: true });
+                    const shieldMesh = new THREE.Mesh(shieldGeometry, shieldMaterial);
+                    shieldMesh.name = 'playerShield'; // Give it a name for easy removal
+                    playerShip.add(shieldMesh);
+                    break;
+                case 'speedBoost':
+                    currentSpeed = baseSpeed * 2; // Double the speed
+                    break;
+                case 'ghostMode':
+                    // Make player ship translucent
+                    playerShip.traverse((object) => {
+                        if (object.isMesh) {
+                            object.material.transparent = true;
+                            object.material.opacity = 0.3;
+                        }
+                    });
+                    break;
+                case 'doubleScore':
+                    // Score logic handled in checkCollisions
+                    break;
+                case 'invincible':
+                    // Make player ship glow white
+                    playerShip.traverse((object) => {
+                        if (object.isMesh) {
+                            object.material.emissive = new THREE.Color(0xFFFFFF);
+                            object.material.emissiveIntensity = 1.5;
+                        }
+                    });
+                    break;
+            }
+
+            // Set a timeout to deactivate the power-up
+            setTimeout(() => deactivatePowerUp(type), powerUpDurations[type]);
+        }
+
+        // Deactivates a power-up effect
+        function deactivatePowerUp(type) {
+            activePowerUps[type] = 0; // Reset end time
+
+            // Revert effects and visual cues
+            switch (type) {
+                case 'shield':
+                    const existingShield = playerShip.getObjectByName('playerShield');
+                    if (existingShield) {
+                        playerShip.remove(existingShield);
+                    }
+                    break;
+                case 'speedBoost':
+                    currentSpeed = baseSpeed; // Reset speed to normal
+                    break;
+                case 'ghostMode':
+                    // Revert player ship opacity
+                    playerShip.traverse((object) => {
+                        if (object.isMesh) {
+                            object.material.transparent = false;
+                            object.material.opacity = 1.0;
+                        }
+                    });
+                    break;
+                case 'doubleScore':
+                    // Nothing to revert visually, score logic handles itself
+                    break;
+                case 'invincible':
+                    // Revert player ship emissive property
+                    playerShip.traverse((object) => {
+                        if (object.isMesh) {
+                            object.material.emissive = new THREE.Color(0x000000); // Black emissive
+                            object.material.emissiveIntensity = 0;
+                        }
+                    });
+                    break;
+            }
+        }
+        
+        // Updates positions and rotations of game objects
+        function updateObjects() {
+            // Use currentSpeed, which can be modified by power-ups
+            camera.position.z -= currentSpeed; // Move camera forward (simulates objects moving backward)
+
+            // Rotate crystals
+            crystals.forEach(crystal => {
+                crystal.rotation.x += 0.01;
+                crystal.rotation.y += 0.01;
+            });
+
+            // Rotate power-ups
+            powerUps.forEach(powerUp => {
+                powerUp.rotation.x += 0.015;
+                powerUp.rotation.y += 0.015;
+            });
+
+            // Update asteroid positions and recycle them
+            asteroids.forEach(asteroid => {
+                asteroid.rotation.z += 0.005; // Rotate asteroids
+                // If asteroid passes behind the camera, reset its position far in front
+                if (asteroid.position.z > camera.position.z) {
+                    asteroid.position.set(THREE.MathUtils.randFloatSpread(150), THREE.MathUtils.randFloatSpread(150), camera.position.z - 500);
+                }
+            });
+
+            // Update crystal positions and recycle them
+            crystals.forEach(crystal => {
+                // If crystal passes behind the camera, reset its position far in front
+                if (crystal.position.z > camera.position.z) {
+                    crystal.position.set(THREE.MathUtils.randFloatSpread(100), THREE.MathUtils.randFloatSpread(100), camera.position.z - 600);
+                    // Add a chance to spawn a power-up instead of a crystal
+                    if (Math.random() < powerUpSpawnChance) {
+                        scene.remove(crystal); // Remove the crystal
+                        crystals.splice(crystals.indexOf(crystal), 1); // Remove from array
+                        createPowerUp(powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)]);
+                    }
+                }
+            });
+
+            // Update power-up positions and recycle them
+            powerUps.forEach(powerUp => {
+                if (powerUp.position.z > camera.position.z) {
+                    scene.remove(powerUp);
+                    powerUps.splice(powerUps.indexOf(powerUp), 1);
+                    createPowerUp(powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)]); // Spawn a new random power-up
+                }
+            });
+
+            // Check for power-up expiration
+            for (const type in activePowerUps) {
+                if (activePowerUps[type] !== 0 && activePowerUps[type] <= Date.now()) {
+                    deactivatePowerUp(type);
+                }
+            }
+        }
+
+        // --- RENDER LOOP ---
+        // The main animation loop that updates and renders the scene
+        function animate() {
+            // Stop the animation loop if the game is over or paused
+            if (isGameOver || isPaused) return;
+
+            requestAnimationFrame(animate); // Request next frame for smooth animation
+
+            updateObjects(); // Update positions and rotations of game objects
+            playerShip.position.z = camera.position.z - 25; // Keep player ship at a fixed distance from the camera
+            checkCollisions(); // Check for any collisions
+            renderer.render(scene, camera); // Render the scene from the camera's perspective
+        }
+
+        // --- START ---
+        // Initialize the game when the window loads
+        window.onload = function () {
+            init();
+        }
+    </script>
+</body>
+</html>
