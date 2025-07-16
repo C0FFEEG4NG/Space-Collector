@@ -203,6 +203,8 @@
 
     <!-- Three.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Tone.js Library for sound effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <script>
         // --- SCENE SETUP ---
         let scene, camera, renderer; // Three.js core components
@@ -235,6 +237,9 @@
         };
         const powerUpTypes = ['shield', 'speedBoost', 'ghostMode', 'doubleScore', 'invincible'];
         const powerUpSpawnChance = 0.02; // 2% chance to spawn a power-up instead of an asteroid/crystal
+
+        // --- SOUND EFFECT SYNTHS ---
+        let powerUpSynth, powerDownSynth, gameOverSynth, crystalSynth;
 
         // --- DOM ELEMENTS ---
         let scoreElement, titleScreen, startButton, pauseScreen, resumeButton,
@@ -296,6 +301,40 @@
             createStarField(); // Create the background star field
             spawnInitialObjects(); // Populate the scene with initial asteroids and crystals
             setupEventListeners(); // Set up all interactive event listeners
+            setupSoundEffects(); // Initialize sound effects
+        }
+
+        // --- SOUND EFFECTS SETUP (Tone.js) ---
+        function setupSoundEffects() {
+            // Power-up sound: short, ascending tone
+            powerUpSynth = new Tone.Synth({
+                oscillator: { type: 'sine' },
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0.05, release: 0.5 }
+            }).toDestination();
+
+            // Power-down sound: short, descending tone
+            powerDownSynth = new Tone.Synth({
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0.05, release: 0.5 }
+            }).toDestination();
+
+            // Game Over sound: deep, impactful hit
+            gameOverSynth = new Tone.MembraneSynth({
+                pitchDecay: 0.05,
+                octaves: 8,
+                envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4 },
+                oscillator: { type: 'fmsine', frequency: 50 }
+            }).toDestination();
+
+            // Crystal Grab sound: bright chime
+            crystalSynth = new Tone.MetalSynth({
+                frequency: 200,
+                envelope: { attack: 0.001, decay: 0.1, sustain: 0.05, release: 0.2 },
+                harmonicity: 5.1,
+                modulationIndex: 32,
+                resonance: 4000,
+                octaves: 1.5
+            }).toDestination();
         }
 
         // --- EVENT LISTENERS SETUP ---
@@ -334,26 +373,29 @@
 
         // --- GAME STATE MANAGEMENT ---
         // Handles starting, pausing, game over, and restarting the game
-        function startGame() {
-            // Attempt to play music. This returns a Promise.
+        async function startGame() {
+            // Ensure Tone.js audio context is started on user interaction
+            await Tone.start();
+
+            // Only start game visuals/logic once
+            if (!isGameStarted) {
+                isGameStarted = true; // Set game state to started
+                titleScreen.style.display = 'none'; // Hide the title screen
+                scoreElement.style.display = 'block'; // Show the score display
+                animate(); // Start the animation loop
+            }
+
+            // Attempt to play background music
             const playPromise = backgroundMusic.play();
 
             if (playPromise !== undefined) {
                 playPromise.then(() => {
                     audioMessageElement.style.display = 'none'; // Hide message if playback is successful
                 }).catch(error => {
-                    console.warn("Audio playback blocked:", error); // Use warn for non-critical errors
+                    console.warn("Background music playback blocked:", error);
                     audioMessageElement.style.display = 'block'; // Show message if playback fails
                 });
-            } else {
-                // Fallback for older browsers that don't return a Promise, or if play() is synchronous
-                audioMessageElement.style.display = 'none'; // Assume success or no blocking
             }
-            
-            isGameStarted = true; // Always start the game visuals
-            titleScreen.style.display = 'none'; // Hide the title screen
-            scoreElement.style.display = 'block'; // Show the score display
-            animate(); // Start the animation loop
         }
 
         function togglePause() {
@@ -381,6 +423,7 @@
         function triggerGameOver() {
             isGameOver = true; // Set game state to game over
             backgroundMusic.pause(); // Stop the music
+            gameOverSynth.triggerAttackRelease('C1', '2n'); // Play game over sound
             finalScoreElement.innerText = `Your Score: ${score}`; // Display final score
             gameOverScreen.style.display = 'flex'; // Show the game over screen
         }
@@ -731,6 +774,7 @@
                     crystals.splice(i, 1); // Remove from array
                     score += (activePowerUps.doubleScore > Date.now()) ? 20 : 10; // Double score if 2x active
                     scoreElement.innerText = `Score: ${score}`; // Update score display
+                    crystalSynth.triggerAttackRelease('C6', '16n'); // Play crystal grab sound
                     createCrystal(); // Spawn a new crystal
                 }
             }
@@ -751,6 +795,7 @@
         function activatePowerUp(type) {
             const now = Date.now();
             activePowerUps[type] = now + powerUpDurations[type]; // Set end time
+            powerUpSynth.triggerAttackRelease(['C5', 'E5', 'G5'], '8n'); // Play power-up sound
 
             // Apply immediate effects and visual cues
             switch (type) {
@@ -795,6 +840,7 @@
         // Deactivates a power-up effect
         function deactivatePowerUp(type) {
             activePowerUps[type] = 0; // Reset end time
+            powerDownSynth.triggerAttackRelease(['G4', 'E4', 'C4'], '8n'); // Play power-down sound
 
             // Revert effects and visual cues
             switch (type) {
