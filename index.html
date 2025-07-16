@@ -334,19 +334,23 @@
 
         // --- GAME STATE MANAGEMENT ---
         // Handles starting, pausing, game over, and restarting the game
-        async function startGame() {
-            try {
-                await backgroundMusic.play();
-                audioMessageElement.style.display = 'none'; // Hide message if playback is successful
-            } catch (error) {
-                console.error("Audio playback failed:", error);
-                audioMessageElement.style.display = 'block'; // Show message if playback fails
-                // If audio fails to play, don't start the game yet.
-                // The user needs to interact again to trigger playback.
-                return; 
+        function startGame() {
+            // Attempt to play music. This returns a Promise.
+            const playPromise = backgroundMusic.play();
+
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    audioMessageElement.style.display = 'none'; // Hide message if playback is successful
+                }).catch(error => {
+                    console.warn("Audio playback blocked:", error); // Use warn for non-critical errors
+                    audioMessageElement.style.display = 'block'; // Show message if playback fails
+                });
+            } else {
+                // Fallback for older browsers that don't return a Promise, or if play() is synchronous
+                audioMessageElement.style.display = 'none'; // Assume success or no blocking
             }
             
-            isGameStarted = true; // Set game state to started
+            isGameStarted = true; // Always start the game visuals
             titleScreen.style.display = 'none'; // Hide the title screen
             scoreElement.style.display = 'block'; // Show the score display
             animate(); // Start the animation loop
